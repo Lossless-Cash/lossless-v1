@@ -1,12 +1,25 @@
 //SPDX-License-Identifier: Unlicense
-pragma solidity ^0.8.3;
+pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-import "./LosslessController.sol";
+interface ILosslessController {
+    function beforeTransfer(address sender, address recipient, uint256 amount) external view;
+    function beforeTransferFrom(address msgSender, address sender, address recipient, uint256 amount) external view;
+    function beforeApprove(address sender, address spender, uint256 amount) external;
+    function beforeIncreaseAllowance(address msgSender, address spender, uint256 addedValue) external;
+    function beforeDecreaseAllowance(address msgSender, address spender, uint256 subtractedValue) external;
+    function afterApprove(address sender, address spender, uint256 amount) external;
+    function afterTransfer(address sender, address recipient, uint256 amount) external;
+    function afterTransferFrom(address msgSender, address sender, address recipient, uint256 amount) external;
+    function afterIncreaseAllowance(address sender, address spender, uint256 addedValue) external;
+    function afterDecreaseAllowance(address sender, address spender, uint256 subtractedValue) external;
+    function setTokenAdmin(address _admin) external;
+    function getTokenAdmin(address tokenAddress) external view returns (address);
+}
 
 contract LERC20 is ERC20 {
-    LosslessController private lossless;
+    ILosslessController private lossless;
     address public recoveryAdmin;
     uint256 public timelockPeriod;
     uint256 public losslessTurnOffDate;
@@ -23,7 +36,7 @@ contract LERC20 is ERC20 {
         _mint(_msgSender(), totalSupply);
         recoveryAdmin = _recoveryAdmin;
         timelockPeriod = _timelockPeriod;
-        lossless = LosslessController(lssAddress);
+        lossless = ILosslessController(lssAddress);
         lossless.setTokenAdmin(_admin);
     }
 

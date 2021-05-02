@@ -4,7 +4,7 @@ require('solidity-coverage');
 // require('hardhat-gas-reporter');
 
 module.exports = {
-  solidity: '0.8.3',
+  solidity: '0.8.0',
   paths: {
     artifacts: './src/artifacts',
   },
