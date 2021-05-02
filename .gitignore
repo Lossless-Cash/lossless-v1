@@ -6,4 +6,4 @@ artifacts
 node_modules
 coverage
 .openzeppelin
-.coverage.json
+coverage.json
