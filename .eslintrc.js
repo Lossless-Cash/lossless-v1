@@ -8,5 +8,7 @@ module.exports = {
   globals: {
     contract: 'writable',
     artifacts: 'writable',
+    ethers: 'writable',
+    upgrades: 'writable',
   },
 };

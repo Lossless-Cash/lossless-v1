@@ -7,3 +7,5 @@ node_modules
 coverage
 .openzeppelin
 coverage.json
+abi
+config.js

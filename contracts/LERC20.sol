@@ -4,8 +4,8 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 interface ILosslessController {
-    function beforeTransfer(address sender, address recipient, uint256 amount) external view;
-    function beforeTransferFrom(address msgSender, address sender, address recipient, uint256 amount) external view;
+    function beforeTransfer(address sender, address recipient, uint256 amount) external;
+    function beforeTransferFrom(address msgSender, address sender, address recipient, uint256 amount) external;
     function beforeApprove(address sender, address spender, uint256 amount) external;
     function beforeIncreaseAllowance(address msgSender, address spender, uint256 addedValue) external;
     function beforeDecreaseAllowance(address msgSender, address spender, uint256 subtractedValue) external;
@@ -14,16 +14,15 @@ interface ILosslessController {
     function afterTransferFrom(address msgSender, address sender, address recipient, uint256 amount) external;
     function afterIncreaseAllowance(address sender, address spender, uint256 addedValue) external;
     function afterDecreaseAllowance(address sender, address spender, uint256 subtractedValue) external;
-    function setTokenAdmin(address _admin) external;
-    function getTokenAdmin(address tokenAddress) external view returns (address);
 }
 
 contract LERC20 is ERC20 {
     ILosslessController private lossless;
     address public recoveryAdmin;
+    address public admin;
     uint256 public timelockPeriod;
     uint256 public losslessTurnOffDate;
-    bool public isLosslessTurnOffProposed = false;
+    bool public isLosslessTurnOffProposed;
     bool public isLosslessOn = true;
 
     event AdminChanged(address indexed previousAdmin, address indexed newAdmin);
@@ -34,10 +33,10 @@ contract LERC20 is ERC20 {
 
     constructor(uint256 totalSupply, string memory name, string memory symbol, address lssAddress, address _admin, address _recoveryAdmin, uint256 _timelockPeriod) ERC20(name, symbol) {
         _mint(_msgSender(), totalSupply);
+        admin = _admin;
         recoveryAdmin = _recoveryAdmin;
         timelockPeriod = _timelockPeriod;
         lossless = ILosslessController(lssAddress);
-        lossless.setTokenAdmin(_admin);
     }
 
     // --- LOSSLESS modifiers ---
@@ -45,71 +44,74 @@ contract LERC20 is ERC20 {
     modifier lssAprove(address spender, uint256 amount) {
         if (isLosslessOn) {
             lossless.beforeApprove(_msgSender(), spender, amount);
-        }
-        _;
-        if (isLosslessOn) {
+            _;
             lossless.afterApprove(_msgSender(), spender, amount);
+        } else {
+            _;
         }
     }
 
     modifier lssTransfer(address recipient, uint256 amount) {
         if (isLosslessOn) {
             lossless.beforeTransfer(_msgSender(), recipient, amount);
-        }
-        _;
-        if (isLosslessOn) {
+            _;
             lossless.afterTransfer(_msgSender(), recipient, amount);
+        } else {
+            _;
         }
     }
 
     modifier lssTransferFrom(address sender, address recipient, uint256 amount) {
         if (isLosslessOn) {
             lossless.beforeTransferFrom(_msgSender(),sender, recipient, amount);
-        }
-        _;
-        if (isLosslessOn) {
+            _;
             lossless.afterTransferFrom(_msgSender(), sender, recipient, amount);
+        } else {
+            _;
         }
     }
 
-    modifier lssIncreaseAllowance(address spender, uint256 subtractedValue) {
+    modifier lssIncreaseAllowance(address spender, uint256 addedValue) {
         if (isLosslessOn) {
-            lossless.beforeIncreaseAllowance(_msgSender(), spender, subtractedValue);
-        }
-        _;
-        if (isLosslessOn) {
-            lossless.afterIncreaseAllowance(_msgSender(), spender, subtractedValue);
+            lossless.beforeIncreaseAllowance(_msgSender(), spender, addedValue);
+            _;
+            lossless.afterIncreaseAllowance(_msgSender(), spender, addedValue);
+        } else {
+            _;
         }
     }
 
     modifier lssDecreaseAllowance(address spender, uint256 subtractedValue) {
         if (isLosslessOn) {
             lossless.beforeDecreaseAllowance(_msgSender(), spender, subtractedValue);
-        }
-        _;
-        if (isLosslessOn) {
+            _;
             lossless.afterDecreaseAllowance(_msgSender(), spender, subtractedValue);
+        } else {
+            _;
         }
     }
 
     modifier onlyRecoveryAdmin() {
-        require(_msgSender() == recoveryAdmin, "LERC20: Sender must be recovery admin");
+        require(_msgSender() == recoveryAdmin, "LERC20: Must be recovery admin");
         _;
     }
 
     // --- LOSSLESS management ---
 
+    function getAdmin() external view returns (address) {
+        return admin;
+    }
+
     function transferOutBlacklistedFunds(address[] calldata from) external {
-        require(_msgSender() == address(lossless), "LERC20: Sender must be lossless contract");
+        require(_msgSender() == address(lossless), "LERC20: Only lossless contract");
         for (uint i = 0; i < from.length; i++) {
             _transfer(from[i], address(lossless), balanceOf(from[i]));
         }
     }
 
     function setLosslessAdmin(address newAdmin) public onlyRecoveryAdmin {
-        require(isLosslessOn, "LERC20: lossless is turned off");
-        emit AdminChanged(lossless.getTokenAdmin(address(this)), newAdmin);
-        lossless.setTokenAdmin(newAdmin);
+        emit AdminChanged(admin, newAdmin);
+        admin = newAdmin;
     }
 
     function setLosslessRecoveryAdmin(address newRecoveryAdmin) public onlyRecoveryAdmin {
@@ -124,8 +126,8 @@ contract LERC20 is ERC20 {
     }
 
     function executeLosslessTurnOff() public onlyRecoveryAdmin {
-        require(isLosslessTurnOffProposed, "LERC20: Lossless turn off is not proposed");
-        require(losslessTurnOffDate <= block.timestamp, "LERC20: Time lock is still in progress");
+        require(isLosslessTurnOffProposed, "LERC20: TurnOff not proposed");
+        require(losslessTurnOffDate <= block.timestamp, "LERC20: Time lock in progress");
         isLosslessOn = false;
         isLosslessTurnOffProposed = false;
         emit LosslessTurnedOff();
@@ -140,27 +142,22 @@ contract LERC20 is ERC20 {
     // --- ERC20 methods ---
 
     function approve(address spender, uint256 amount) public virtual override lssAprove(spender, amount) returns (bool) {
-        _approve(_msgSender(), spender, amount);
-        return true;
+        return super.approve(spender, amount);
     }
 
     function transfer(address recipient, uint256 amount) public virtual override lssTransfer(recipient, amount) returns (bool) {
-        _transfer(_msgSender(), recipient, amount);
-        return true;
+        return super.transfer(recipient, amount);
     }
 
     function transferFrom(address sender, address recipient, uint256 amount) public virtual override lssTransferFrom(sender, recipient, amount) returns (bool) {
-        bool result = super.transferFrom(sender, recipient, amount);
-        return result;
+        return super.transferFrom(sender, recipient, amount);
     }
 
     function increaseAllowance(address spender, uint256 addedValue) public virtual override lssIncreaseAllowance(spender, addedValue) returns (bool) {
-        bool result = super.increaseAllowance(spender, addedValue);
-        return result;
+        return super.increaseAllowance(spender, addedValue);
     }
 
     function decreaseAllowance(address spender, uint256 subtractedValue) public virtual override lssDecreaseAllowance(spender, subtractedValue) returns (bool) {
-        bool result = super.decreaseAllowance(spender, subtractedValue);
-        return result;
+        return super.decreaseAllowance(spender, subtractedValue);
     }
 }
