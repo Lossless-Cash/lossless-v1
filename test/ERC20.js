@@ -321,16 +321,38 @@ function regularERC20() {
           });
 
           describe('when the recipient had an approved amount', () => {
-            it('approves the requested amount and replaces the previous one', async () => {
-              await token.connect(initialHolder).approve(recipient.address, 1);
+            describe('when the previous approved amount is not a zero', () => {
+              it('reverts', async () => {
+                await token
+                  .connect(initialHolder)
+                  .approve(recipient.address, 1);
+                await expect(
+                  token
+                    .connect(initialHolder)
+                    .approve(recipient.address, initialBalance),
+                ).to.be.revertedWith('ERC20: Cannot change non zero allowance');
+              });
+            });
 
-              await token
-                .connect(initialHolder)
-                .approve(recipient.address, initialBalance);
+            describe('when the previous approved amount is zero', () => {
+              it('approves the requested amount and replaces the previous one', async () => {
+                await token
+                  .connect(initialHolder)
+                  .approve(recipient.address, 1);
+                await token
+                  .connect(initialHolder)
+                  .approve(recipient.address, 0);
+                await token
+                  .connect(initialHolder)
+                  .approve(recipient.address, initialBalance);
 
-              expect(
-                await token.allowance(initialHolder.address, recipient.address),
-              ).to.be.equal(initialBalance);
+                expect(
+                  await token.allowance(
+                    initialHolder.address,
+                    recipient.address,
+                  ),
+                ).to.be.equal(initialBalance);
+              });
             });
           });
 
@@ -365,23 +387,40 @@ function regularERC20() {
             });
 
             describe('when the recipient had an approved amount', () => {
-              beforeEach(async () => {
-                await token
-                  .connect(initialHolder)
-                  .approve(recipient.address, 1);
+              describe('when the previous approved amount is not a zero', () => {
+                it('reverts', async () => {
+                  await token
+                    .connect(initialHolder)
+                    .approve(recipient.address, 1);
+                  await expect(
+                    token
+                      .connect(initialHolder)
+                      .approve(recipient.address, initialBalance),
+                  ).to.be.revertedWith(
+                    'ERC20: Cannot change non zero allowance',
+                  );
+                });
               });
 
-              it('approves the requested amount and replaces the previous one', async () => {
-                await token
-                  .connect(initialHolder)
-                  .approve(recipient.address, initialBalance + 1);
+              describe('when the previous approved amount is zero', () => {
+                it('approves the requested amount and replaces the previous one', async () => {
+                  await token
+                    .connect(initialHolder)
+                    .approve(recipient.address, 1);
+                  await token
+                    .connect(initialHolder)
+                    .approve(recipient.address, 0);
+                  await token
+                    .connect(initialHolder)
+                    .approve(recipient.address, initialBalance);
 
-                expect(
-                  await token.allowance(
-                    initialHolder.address,
-                    recipient.address,
-                  ),
-                ).to.be.equal(initialBalance + 1);
+                  expect(
+                    await token.allowance(
+                      initialHolder.address,
+                      recipient.address,
+                    ),
+                  ).to.be.equal(initialBalance);
+                });
               });
             });
           });
@@ -766,18 +805,29 @@ function regularERC20() {
         });
 
         describe('when the recipient had an approved amount', () => {
-          it('approves the requested amount and replaces the previous one', async () => {
-            await token.connect(initialHolder).approve(recipient.address, 1);
+          describe('when the previous approved amount is not a zero', () => {
+            it('reverts', async () => {
+              await token.connect(initialHolder).approve(recipient.address, 1);
+              await expect(
+                token
+                  .connect(initialHolder)
+                  .approve(recipient.address, initialBalance),
+              ).to.be.revertedWith('ERC20: Cannot change non zero allowance');
+            });
+          });
 
-            await token.approveInternal(
-              initialHolder.address,
-              recipient.address,
-              initialBalance,
-            );
+          describe('when the previous approved amount is zero', () => {
+            it('approves the requested amount and replaces the previous one', async () => {
+              await token.connect(initialHolder).approve(recipient.address, 1);
+              await token.connect(initialHolder).approve(recipient.address, 0);
+              await token
+                .connect(initialHolder)
+                .approve(recipient.address, initialBalance);
 
-            expect(
-              await token.allowance(initialHolder.address, recipient.address),
-            ).to.be.equal(initialBalance);
+              expect(
+                await token.allowance(initialHolder.address, recipient.address),
+              ).to.be.equal(initialBalance);
+            });
           });
         });
 
@@ -813,24 +863,38 @@ function regularERC20() {
           });
 
           describe('when the recipient had an approved amount', () => {
-            beforeEach(async () => {
-              await token.approveInternal(
-                initialHolder.address,
-                recipient.address,
-                1,
-              );
+            describe('when the previous approved amount is not a zero', () => {
+              it('reverts', async () => {
+                await token
+                  .connect(initialHolder)
+                  .approve(recipient.address, 1);
+                await expect(
+                  token
+                    .connect(initialHolder)
+                    .approve(recipient.address, initialBalance),
+                ).to.be.revertedWith('ERC20: Cannot change non zero allowance');
+              });
             });
 
-            it('approves the requested amount and replaces the previous one', async () => {
-              await token.approveInternal(
-                initialHolder.address,
-                recipient.address,
-                initialBalance + 1,
-              );
+            describe('when the previous approved amount is zero', () => {
+              it('approves the requested amount and replaces the previous one', async () => {
+                await token
+                  .connect(initialHolder)
+                  .approve(recipient.address, 1);
+                await token
+                  .connect(initialHolder)
+                  .approve(recipient.address, 0);
+                await token
+                  .connect(initialHolder)
+                  .approve(recipient.address, initialBalance);
 
-              expect(
-                await token.allowance(initialHolder.address, recipient.address),
-              ).to.be.equal(initialBalance + 1);
+                expect(
+                  await token.allowance(
+                    initialHolder.address,
+                    recipient.address,
+                  ),
+                ).to.be.equal(initialBalance);
+              });
             });
           });
         });
