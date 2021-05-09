@@ -64,7 +64,7 @@ function regularERC20() {
               token
                 .connect(initialHolder)
                 .transfer(recipient.address, initialBalance + 1),
-            ).to.be.revertedWith('ERC20: transfer amount exceeds balance');
+            ).to.be.revertedWith('LERC20: transfer amount exceeds balance');
           });
         });
       });
@@ -115,7 +115,7 @@ function regularERC20() {
         it('reverts', async () => {
           await expect(
             token.connect(initialHolder).transfer(ZERO_ADDRESS, initialBalance),
-          ).to.be.revertedWith('ERC20: transfer to the zero address');
+          ).to.be.revertedWith('LERC20: transfer to the zero address');
         });
       });
     });
@@ -215,7 +215,7 @@ function regularERC20() {
                       anotherAccount.address,
                       initialBalance + 1,
                     ),
-                ).to.be.revertedWith('ERC20: transfer amount exceeds balance');
+                ).to.be.revertedWith('LERC20: transfer amount exceeds balance');
               });
             });
           });
@@ -238,7 +238,7 @@ function regularERC20() {
                       initialBalance,
                     ),
                 ).to.be.revertedWith(
-                  'ERC20: transfer amount exceeds allowance',
+                  'LERC20: transfer amount exceeds allowance',
                 );
               });
             });
@@ -253,7 +253,7 @@ function regularERC20() {
                       anotherAccount.address,
                       initialBalance + 1,
                     ),
-                ).to.be.revertedWith('ERC20: transfer amount exceeds balance');
+                ).to.be.revertedWith('LERC20: transfer amount exceeds balance');
               });
             });
           });
@@ -275,7 +275,7 @@ function regularERC20() {
                   ZERO_ADDRESS,
                   initialBalance,
                 ),
-            ).to.be.revertedWith('ERC20: transfer to the zero address');
+            ).to.be.revertedWith('LERC20: transfer to the zero address');
           });
         });
       });
@@ -286,7 +286,7 @@ function regularERC20() {
             token
               .connect(recipient)
               .transferFrom(ZERO_ADDRESS, recipient.address, initialBalance),
-          ).to.be.revertedWith('ERC20: transfer from the zero address');
+          ).to.be.revertedWith('LERC20: transfer from the zero address');
         });
       });
     });
@@ -330,7 +330,9 @@ function regularERC20() {
                   token
                     .connect(initialHolder)
                     .approve(recipient.address, initialBalance),
-                ).to.be.revertedWith('ERC20: Cannot change non zero allowance');
+                ).to.be.revertedWith(
+                  'LERC20: Cannot change non zero allowance',
+                );
               });
             });
 
@@ -397,7 +399,7 @@ function regularERC20() {
                       .connect(initialHolder)
                       .approve(recipient.address, initialBalance),
                   ).to.be.revertedWith(
-                    'ERC20: Cannot change non zero allowance',
+                    'LERC20: Cannot change non zero allowance',
                   );
                 });
               });
@@ -431,7 +433,7 @@ function regularERC20() {
         it('reverts', async () => {
           await expect(
             token.connect(initialHolder).approve(ZERO_ADDRESS, initialBalance),
-          ).to.be.revertedWith('ERC20: approve to the zero address');
+          ).to.be.revertedWith('LERC20: approve to the zero address');
         });
       });
     });
@@ -446,7 +448,7 @@ function regularERC20() {
               token
                 .connect(initialHolder)
                 .decreaseAllowance(recipient.address, amount),
-            ).to.be.revertedWith('ERC20: decreased allowance below zero');
+            ).to.be.revertedWith('LERC20: decreased allowance below zero');
           });
         });
 
@@ -493,7 +495,7 @@ function regularERC20() {
               token
                 .connect(initialHolder)
                 .decreaseAllowance(recipient.address, approvedAmount + 1),
-            ).to.be.revertedWith('ERC20: decreased allowance below zero');
+            ).to.be.revertedWith('LERC20: decreased allowance below zero');
           });
         });
       }
@@ -517,7 +519,7 @@ function regularERC20() {
           token
             .connect(initialHolder)
             .decreaseAllowance(ZERO_ADDRESS, initialBalance),
-        ).to.be.revertedWith('ERC20: decreased allowance below zero');
+        ).to.be.revertedWith('LERC20: decreased allowance below zero');
       });
     });
   });
@@ -614,7 +616,7 @@ function regularERC20() {
           token
             .connect(initialHolder)
             .increaseAllowance(ZERO_ADDRESS, initialBalance),
-        ).to.be.revertedWith('ERC20: approve to the zero address');
+        ).to.be.revertedWith('LERC20: approve to the zero address');
       });
     });
   });
@@ -622,7 +624,7 @@ function regularERC20() {
   describe('_mint', () => {
     it('rejects a null account', async () => {
       await expect(token.mint(ZERO_ADDRESS, 50)).to.be.revertedWith(
-        'ERC20: mint to the zero address',
+        'LERC20: mint to the zero address',
       );
     });
 
@@ -648,47 +650,6 @@ function regularERC20() {
     });
   });
 
-  describe('_burn', () => {
-    it('rejects a null account', async () => {
-      await expect(token.burn(ZERO_ADDRESS, 1)).to.be.revertedWith(
-        'ERC20: burn from the zero address',
-      );
-    });
-
-    describe('for a non zero account', () => {
-      it('rejects burning more than balance', async () => {
-        await expect(
-          token.burn(initialHolder.address, initialBalance + 1),
-        ).to.be.revertedWith('ERC20: burn amount exceeds balance');
-      });
-
-      const describeBurn = function (description, amount) {
-        describe(description, () => {
-          it('decrements totalSupply', async () => {
-            await token.burn(initialHolder.address, amount);
-            expect(await token.totalSupply()).to.be.equal(totalSupply - amount);
-          });
-
-          it('decrements initialHolder balance', async () => {
-            await token.burn(initialHolder.address, amount);
-            expect(await token.balanceOf(initialHolder.address)).to.be.equal(
-              initialBalance - amount,
-            );
-          });
-
-          it('emits Transfer event', async () => {
-            await expect(token.burn(initialHolder.address, amount))
-              .to.emit(token, 'Transfer')
-              .withArgs(initialHolder.address, ZERO_ADDRESS, amount);
-          });
-        });
-      };
-
-      describeBurn('for entire balance', initialBalance);
-      describeBurn('for less amount than balance', initialBalance - 1);
-    });
-  });
-
   describe('_transfer', () => {
     describe('when the recipient is not the zero address', () => {
       describe('when the sender does not have enough balance', () => {
@@ -699,7 +660,7 @@ function regularERC20() {
               recipient.address,
               initialBalance + 1,
             ),
-          ).to.be.revertedWith('ERC20: transfer amount exceeds balance');
+          ).to.be.revertedWith('LERC20: transfer amount exceeds balance');
         });
       });
     });
@@ -758,7 +719,7 @@ function regularERC20() {
             ZERO_ADDRESS,
             initialBalance,
           ),
-        ).to.be.revertedWith('ERC20: transfer to the zero address');
+        ).to.be.revertedWith('LERC20: transfer to the zero address');
       });
     });
 
@@ -770,7 +731,7 @@ function regularERC20() {
             recipient.address,
             initialBalance,
           ),
-        ).to.be.revertedWith('ERC20: transfer from the zero address');
+        ).to.be.revertedWith('LERC20: transfer from the zero address');
       });
     });
   });
@@ -812,7 +773,7 @@ function regularERC20() {
                 token
                   .connect(initialHolder)
                   .approve(recipient.address, initialBalance),
-              ).to.be.revertedWith('ERC20: Cannot change non zero allowance');
+              ).to.be.revertedWith('LERC20: Cannot change non zero allowance');
             });
           });
 
@@ -872,7 +833,9 @@ function regularERC20() {
                   token
                     .connect(initialHolder)
                     .approve(recipient.address, initialBalance),
-                ).to.be.revertedWith('ERC20: Cannot change non zero allowance');
+                ).to.be.revertedWith(
+                  'LERC20: Cannot change non zero allowance',
+                );
               });
             });
 
@@ -909,7 +872,7 @@ function regularERC20() {
             ZERO_ADDRESS,
             initialBalance,
           ),
-        ).to.be.revertedWith('ERC20: approve to the zero address');
+        ).to.be.revertedWith('LERC20: approve to the zero address');
       });
     });
 
@@ -921,13 +884,13 @@ function regularERC20() {
             recipient.address,
             initialBalance,
           ),
-        ).to.be.revertedWith('ERC20: approve from the zero address');
+        ).to.be.revertedWith('LERC20: approve from the zero address');
       });
     });
   });
 }
 
-describe('ERC20 WITH LOSSLESS V1', () => {
+describe('LERC20 WITH LOSSLESS V1', () => {
   beforeEach(async () => {
     [
       deployer,
@@ -968,7 +931,7 @@ describe('ERC20 WITH LOSSLESS V1', () => {
   regularERC20();
 });
 
-describe('ERC20 WITH LOSSLESS TURNED OFF', () => {
+describe('LERC20 WITH LOSSLESS TURNED OFF', () => {
   beforeEach(async () => {
     [
       deployer,
