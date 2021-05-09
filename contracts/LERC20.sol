@@ -60,20 +60,23 @@ contract LERC20 is Context, IERC20 {
     string private _symbol;
 
     address public recoveryAdmin;
+    address private recoveryAdminCanditate;
+    bytes32 private recoveryAdminKeyHash;
     address public admin;
     uint256 public timelockPeriod;
-    uint256 public losslessTurnOffDate;
+    uint256 public losslessTurnOffTimestamp;
     bool public isLosslessTurnOffProposed;
     bool public isLosslessOn = true;
     ILosslessController private lossless;
 
     event AdminChanged(address indexed previousAdmin, address indexed newAdmin);
+    event RecoveryAdminChangeProposed(address indexed candidate);
     event RecoveryAdminChanged(address indexed previousAdmin, address indexed newAdmin);
     event LosslessTurnOffProposed(uint256 turnOffDate);
     event LosslessTurnedOff();
     event LosslessTurnedOn();
 
-    constructor(uint256 totalSupply_, string memory name_, string memory symbol_, address lossless_, address admin_, address recoveryAdmin_, uint256 timelockPeriod_) {
+    constructor(uint256 totalSupply_, string memory name_, string memory symbol_, address admin_, address recoveryAdmin_, uint256 timelockPeriod_, address lossless_) {
         _mint(_msgSender(), totalSupply_);
         _name = name_;
         _symbol = symbol_;
@@ -158,20 +161,28 @@ contract LERC20 is Context, IERC20 {
         admin = newAdmin;
     }
 
-    function setLosslessRecoveryAdmin(address newRecoveryAdmin) public onlyRecoveryAdmin {
-        emit RecoveryAdminChanged(recoveryAdmin, newRecoveryAdmin);
-        recoveryAdmin = newRecoveryAdmin;
+    function transferRecoveryAdminOwnership(address candidate, bytes32 keyHash) public onlyRecoveryAdmin {
+        recoveryAdminCanditate = candidate;
+        recoveryAdminKeyHash = keyHash;
+        emit RecoveryAdminChangeProposed(candidate);
+    }
+
+    function acceptRecoveryAdminOwnership(bytes memory key) external {
+        require(_msgSender() == recoveryAdminCanditate, "LERC20: Must be canditate");
+        require(keccak256(key) == recoveryAdminKeyHash, "LERC20: Invalid key");
+        emit RecoveryAdminChanged(recoveryAdmin, recoveryAdminCanditate);
+        recoveryAdmin = recoveryAdminCanditate;
     }
 
     function proposeLosslessTurnOff() public onlyRecoveryAdmin {
-        losslessTurnOffDate = block.timestamp + timelockPeriod;
+        losslessTurnOffTimestamp = block.timestamp + timelockPeriod;
         isLosslessTurnOffProposed = true;
-        emit LosslessTurnOffProposed(losslessTurnOffDate);
+        emit LosslessTurnOffProposed(losslessTurnOffTimestamp);
     }
 
     function executeLosslessTurnOff() public onlyRecoveryAdmin {
         require(isLosslessTurnOffProposed, "LERC20: TurnOff not proposed");
-        require(losslessTurnOffDate <= block.timestamp, "LERC20: Time lock in progress");
+        require(losslessTurnOffTimestamp <= block.timestamp, "LERC20: Time lock in progress");
         isLosslessOn = false;
         isLosslessTurnOffProposed = false;
         emit LosslessTurnedOff();
@@ -215,7 +226,7 @@ contract LERC20 is Context, IERC20 {
     }
 
     function approve(address spender, uint256 amount) public virtual override lssAprove(spender, amount) returns (bool) {
-        require((amount == 0) || (_allowances[_msgSender()][spender] == 0), "ERC20: Cannot change non zero allowance");
+        require((amount == 0) || (_allowances[_msgSender()][spender] == 0), "LERC20: Cannot change non zero allowance");
         _approve(_msgSender(), spender, amount);
         return true;
     }
@@ -224,7 +235,7 @@ contract LERC20 is Context, IERC20 {
         _transfer(sender, recipient, amount);
 
         uint256 currentAllowance = _allowances[sender][_msgSender()];
-        require(currentAllowance >= amount, "ERC20: transfer amount exceeds allowance");
+        require(currentAllowance >= amount, "LERC20: transfer amount exceeds allowance");
         _approve(sender, _msgSender(), currentAllowance - amount);
 
         return true;
@@ -237,20 +248,18 @@ contract LERC20 is Context, IERC20 {
 
     function decreaseAllowance(address spender, uint256 subtractedValue) public virtual lssDecreaseAllowance(spender, subtractedValue) returns (bool) {
         uint256 currentAllowance = _allowances[_msgSender()][spender];
-        require(currentAllowance >= subtractedValue, "ERC20: decreased allowance below zero");
+        require(currentAllowance >= subtractedValue, "LERC20: decreased allowance below zero");
         _approve(_msgSender(), spender, currentAllowance - subtractedValue);
 
         return true;
     }
 
     function _transfer(address sender, address recipient, uint256 amount) internal virtual {
-        require(sender != address(0), "ERC20: transfer from the zero address");
-        require(recipient != address(0), "ERC20: transfer to the zero address");
-
-        _beforeTokenTransfer(sender, recipient, amount);
+        require(sender != address(0), "LERC20: transfer from the zero address");
+        require(recipient != address(0), "LERC20: transfer to the zero address");
 
         uint256 senderBalance = _balances[sender];
-        require(senderBalance >= amount, "ERC20: transfer amount exceeds balance");
+        require(senderBalance >= amount, "LERC20: transfer amount exceeds balance");
         _balances[sender] = senderBalance - amount;
         _balances[recipient] += amount;
 
@@ -258,35 +267,18 @@ contract LERC20 is Context, IERC20 {
     }
 
     function _mint(address account, uint256 amount) internal virtual {
-        require(account != address(0), "ERC20: mint to the zero address");
-
-        _beforeTokenTransfer(address(0), account, amount);
+        require(account != address(0), "LERC20: mint to the zero address");
 
         _totalSupply += amount;
         _balances[account] += amount;
         emit Transfer(address(0), account, amount);
     }
 
-    function _burn(address account, uint256 amount) internal virtual {
-        require(account != address(0), "ERC20: burn from the zero address");
-
-        _beforeTokenTransfer(account, address(0), amount);
-
-        uint256 accountBalance = _balances[account];
-        require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
-        _balances[account] = accountBalance - amount;
-        _totalSupply -= amount;
-
-        emit Transfer(account, address(0), amount);
-    }
-
     function _approve(address owner, address spender, uint256 amount) internal virtual {
-        require(owner != address(0), "ERC20: approve from the zero address");
-        require(spender != address(0), "ERC20: approve to the zero address");
+        require(owner != address(0), "LERC20: approve from the zero address");
+        require(spender != address(0), "LERC20: approve to the zero address");
 
         _allowances[owner][spender] = amount;
         emit Approval(owner, spender, amount);
     }
-
-    function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual { }
 }

@@ -108,15 +108,18 @@ describe('LERC20', () => {
     });
   });
 
-  describe('setLosslessRecoveryAdmin', () => {
+  describe('transferRecoveryAdminOwnership', () => {
     describe('when sender is not recovery admin', () => {
       it('should revert', async () => {
         it('should revert', async () => {
           await expect(
             erc20
-              .connect(admin)
-              .setLosslessRecoveryAdmin(oneMoreAccount.address),
-          ).to.be.revertedWith('LERC20: Must be recovery admin');
+              .connect(oneMoreAccount)
+              .transferRecoveryAdminOwnership(
+                oneMoreAccount.address,
+                ethers.utils.keccak256(ethers.utils.toUtf8Bytes('test-key')),
+              ),
+          ).to.be.revertedWith('LERC20: Must be recoveryAdmin');
         });
       });
     });
@@ -124,27 +127,103 @@ describe('LERC20', () => {
     describe('when sender is regular admin', () => {
       it('should revert', async () => {
         await expect(
-          erc20.connect(admin).setLosslessRecoveryAdmin(oneMoreAccount.address),
+          erc20
+            .connect(admin)
+            .transferRecoveryAdminOwnership(
+              oneMoreAccount.address,
+              ethers.utils.keccak256(ethers.utils.toUtf8Bytes('test-key')),
+            ),
         ).to.be.revertedWith('LERC20: Must be recovery admin');
       });
     });
 
     describe('when sender is recovery admin', () => {
-      it('should change admin', async () => {
-        await erc20
-          .connect(recoveryAdmin)
-          .setLosslessRecoveryAdmin(oneMoreAccount.address);
-        expect(await erc20.recoveryAdmin()).to.eq(oneMoreAccount.address);
-      });
-
-      it('should emit RecoveryAdminChanged event', async () => {
+      it('should emit RecoveryAdminChangeProposed event', async () => {
         await expect(
           erc20
             .connect(recoveryAdmin)
-            .setLosslessRecoveryAdmin(oneMoreAccount.address),
+            .transferRecoveryAdminOwnership(
+              oneMoreAccount.address,
+              ethers.utils.keccak256(ethers.utils.toUtf8Bytes('test-key')),
+            ),
         )
-          .to.emit(erc20, 'RecoveryAdminChanged')
-          .withArgs(recoveryAdmin.address, oneMoreAccount.address);
+          .to.emit(erc20, 'RecoveryAdminChangeProposed')
+          .withArgs(oneMoreAccount.address);
+      });
+
+      describe('when new admin is proposed', () => {
+        beforeEach(async () => {
+          await erc20
+            .connect(recoveryAdmin)
+            .transferRecoveryAdminOwnership(
+              oneMoreAccount.address,
+              ethers.utils.keccak256(ethers.utils.toUtf8Bytes('test-key')),
+            );
+        });
+
+        describe('when accepting admin is canditate', () => {
+          describe('when key is correct', () => {
+            it('should change admin', async () => {
+              await erc20
+                .connect(oneMoreAccount)
+                .acceptRecoveryAdminOwnership(
+                  ethers.utils.toUtf8Bytes('test-key'),
+                );
+
+              expect(await erc20.recoveryAdmin()).to.equal(
+                oneMoreAccount.address,
+              );
+            });
+
+            it('should emit RecoveryAdminChanged event', async () => {
+              await expect(
+                erc20
+                  .connect(oneMoreAccount)
+                  .acceptRecoveryAdminOwnership(
+                    ethers.utils.toUtf8Bytes('test-key'),
+                  ),
+              )
+                .to.emit(erc20, 'RecoveryAdminChanged')
+                .withArgs(recoveryAdmin.address, oneMoreAccount.address);
+            });
+          });
+
+          describe('when key is incorrect', () => {
+            it('should revert', async () => {
+              await expect(
+                erc20
+                  .connect(oneMoreAccount)
+                  .acceptRecoveryAdminOwnership(
+                    ethers.utils.toUtf8Bytes('test-key-2'),
+                  ),
+              ).to.be.revertedWith('LERC20: Invalid key');
+            });
+          });
+        });
+
+        describe('when accepting admin is not canditate', () => {
+          it('should revert', async () => {
+            await expect(
+              erc20
+                .connect(anotherAccount)
+                .acceptRecoveryAdminOwnership(
+                  ethers.utils.toUtf8Bytes('test-key'),
+                ),
+            ).to.be.revertedWith('LERC20: Must be canditate');
+          });
+        });
+      });
+
+      describe('when new recovery admin is not proposed', () => {
+        it('should revert', async () => {
+          await expect(
+            erc20
+              .connect(oneMoreAccount)
+              .acceptRecoveryAdminOwnership(
+                ethers.utils.toUtf8Bytes('test-key'),
+              ),
+          ).to.be.revertedWith('LERC20: Must be canditate');
+        });
       });
     });
   });
@@ -167,12 +246,12 @@ describe('LERC20', () => {
     });
 
     describe('when sender is recovery admin', () => {
-      it('should set losslessTurnOffDate and isLosslessTurnOffProposed', async () => {
+      it('should set losslessTurnOffTimestamp and isLosslessTurnOffProposed', async () => {
         await erc20.connect(recoveryAdmin).proposeLosslessTurnOff();
 
-        const losslessTurnOffDate = await erc20.losslessTurnOffDate();
+        const losslessTurnOffTimestamp = await erc20.losslessTurnOffTimestamp();
         const isLosslessTurnOffProposed = await erc20.isLosslessTurnOffProposed();
-        expect(losslessTurnOffDate).to.be.equal(
+        expect(losslessTurnOffTimestamp).to.be.equal(
           await getTimestamp(duration.days(1)),
         );
         expect(isLosslessTurnOffProposed).to.equal(true);

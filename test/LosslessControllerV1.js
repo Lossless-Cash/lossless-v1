@@ -1,32 +1,19 @@
-const { time } = require('@openzeppelin/test-helpers');
 const { expect } = require('chai');
 
-let initialHolder;
-let admin;
-let adminBackup;
 let lssAdmin;
 let lssRecoveryAdmin;
 let oneMoreAccount;
 let pauseAdmin;
 
 let losslessController;
-let erc20;
-
-const name = 'My Token';
-const symbol = 'MTKN';
-
-const initialSupply = 100;
 
 describe('LosslessControllerV1', () => {
   beforeEach(async () => {
     [
-      initialHolder,
-      admin,
       lssAdmin,
       lssRecoveryAdmin,
       oneMoreAccount,
       pauseAdmin,
-      adminBackup,
     ] = await ethers.getSigners();
 
     const LosslessController = await ethers.getContractFactory(
@@ -38,19 +25,6 @@ describe('LosslessControllerV1', () => {
       lssRecoveryAdmin.address,
       pauseAdmin.address,
     ]);
-
-    const LERC20Mock = await ethers.getContractFactory('LERC20Mock');
-    erc20 = await LERC20Mock.deploy(
-      0,
-      name,
-      symbol,
-      initialHolder.address,
-      initialSupply,
-      losslessController.address,
-      admin.address,
-      adminBackup.address,
-      Number(time.duration.days(1)),
-    );
   });
 
   describe('getVersion', () => {
@@ -173,29 +147,19 @@ describe('LosslessControllerV1', () => {
     });
   });
 
-  describe('setRecoveryAdmin', () => {
+  describe('transferRecoveryAdminOwnership', () => {
     describe('when sender is not recovery admin', () => {
       it('should revert', async () => {
         it('should revert', async () => {
           await expect(
             losslessController
               .connect(oneMoreAccount)
-              .setRecoveryAdmin(oneMoreAccount.address),
+              .transferRecoveryAdminOwnership(
+                oneMoreAccount.address,
+                ethers.utils.keccak256(ethers.utils.toUtf8Bytes('test-key')),
+              ),
           ).to.be.revertedWith('LOSSLESS: Must be recoveryAdmin');
         });
-      });
-    });
-
-    describe('when contract is paused', () => {
-      it('should change admin', async () => {
-        await losslessController.connect(pauseAdmin).pause();
-        await losslessController
-          .connect(lssRecoveryAdmin)
-          .setRecoveryAdmin(oneMoreAccount.address);
-
-        expect(await losslessController.recoveryAdmin()).to.equal(
-          oneMoreAccount.address,
-        );
       });
     });
 
@@ -204,30 +168,121 @@ describe('LosslessControllerV1', () => {
         await expect(
           losslessController
             .connect(lssAdmin)
-            .setRecoveryAdmin(oneMoreAccount.address),
+            .transferRecoveryAdminOwnership(
+              oneMoreAccount.address,
+              ethers.utils.keccak256(ethers.utils.toUtf8Bytes('test-key')),
+            ),
         ).to.be.revertedWith('LOSSLESS: Must be recoveryAdmin');
       });
     });
 
-    describe('when sender is recovery admin', () => {
-      it('should change admin', async () => {
+    describe('when contract is paused', () => {
+      it('should set canditate admin', async () => {
+        await losslessController.connect(pauseAdmin).pause();
         await losslessController
           .connect(lssRecoveryAdmin)
-          .setRecoveryAdmin(oneMoreAccount.address);
+          .transferRecoveryAdminOwnership(
+            oneMoreAccount.address,
+            ethers.utils.keccak256(ethers.utils.toUtf8Bytes('test-key')),
+          );
+
+        await losslessController
+          .connect(oneMoreAccount)
+          .acceptRecoveryAdminOwnership(ethers.utils.toUtf8Bytes('test-key'));
 
         expect(await losslessController.recoveryAdmin()).to.equal(
           oneMoreAccount.address,
         );
       });
+    });
 
-      it('should emit RecoveryAdminChanged event', async () => {
+    describe('when sender is recovery admin', () => {
+      it('should emit RecoveryAdminChangeProposed event', async () => {
         await expect(
           losslessController
             .connect(lssRecoveryAdmin)
-            .setRecoveryAdmin(oneMoreAccount.address),
+            .transferRecoveryAdminOwnership(
+              oneMoreAccount.address,
+              ethers.utils.keccak256(ethers.utils.toUtf8Bytes('test-key')),
+            ),
         )
-          .to.emit(losslessController, 'RecoveryAdminChanged')
-          .withArgs(lssRecoveryAdmin.address, oneMoreAccount.address);
+          .to.emit(losslessController, 'RecoveryAdminChangeProposed')
+          .withArgs(oneMoreAccount.address);
+      });
+
+      describe('when new admin is proposed', () => {
+        beforeEach(async () => {
+          await losslessController
+            .connect(lssRecoveryAdmin)
+            .transferRecoveryAdminOwnership(
+              oneMoreAccount.address,
+              ethers.utils.keccak256(ethers.utils.toUtf8Bytes('test-key')),
+            );
+        });
+
+        describe('when accepting admin is canditate', () => {
+          describe('when key is correct', () => {
+            it('should change admin', async () => {
+              await losslessController
+                .connect(oneMoreAccount)
+                .acceptRecoveryAdminOwnership(
+                  ethers.utils.toUtf8Bytes('test-key'),
+                );
+
+              expect(await losslessController.recoveryAdmin()).to.equal(
+                oneMoreAccount.address,
+              );
+            });
+
+            it('should emit RecoveryAdminChanged event', async () => {
+              await expect(
+                losslessController
+                  .connect(oneMoreAccount)
+                  .acceptRecoveryAdminOwnership(
+                    ethers.utils.toUtf8Bytes('test-key'),
+                  ),
+              )
+                .to.emit(losslessController, 'RecoveryAdminChanged')
+                .withArgs(lssRecoveryAdmin.address, oneMoreAccount.address);
+            });
+          });
+
+          describe('when key is incorrect', () => {
+            it('should revert', async () => {
+              await expect(
+                losslessController
+                  .connect(oneMoreAccount)
+                  .acceptRecoveryAdminOwnership(
+                    ethers.utils.toUtf8Bytes('test-key-2'),
+                  ),
+              ).to.be.revertedWith('LOSSLESS: Invalid key');
+            });
+          });
+        });
+
+        describe('when accepting admin is not canditate', () => {
+          it('should revert', async () => {
+            await expect(
+              losslessController
+                .connect(lssAdmin)
+                .acceptRecoveryAdminOwnership(
+                  ethers.utils.toUtf8Bytes('test-key'),
+                ),
+            ).to.be.revertedWith('LOSSLESS: Must be canditate');
+          });
+        });
+      });
+
+      describe('when new recovery admin is not proposed', () => {
+        it('should revert', async () => {
+          await expect(
+            losslessController
+              .connect(oneMoreAccount)
+              .acceptRecoveryAdminOwnership(
+                ethers.utils.toUtf8Bytes('test-key'),
+              ),
+          ).to.be.revertedWith('LOSSLESS: Must be canditate');
+        });
       });
     });
   });
