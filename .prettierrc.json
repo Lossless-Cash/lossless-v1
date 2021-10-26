@@ -16,6 +16,5 @@
   "trailingComma": "all",
   "useTabs": false,
   "vueIndentScriptAndStyle": false,
-  "filepath": "/Users/domantas/Documents/Github/lss/hardhat.config.ts",
   "parser": "typescript"
 }
