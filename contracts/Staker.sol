@@ -16,12 +16,14 @@ interface IRewardToken {
     function admin() external view returns (address);
     function getRewardPeriod() external view returns (uint256);
     function getDepositFee() external view returns(uint64);
-    function getwithdrawFee() external view returns(uint64);
+    function getWithdrawFee() external view returns(uint64);
 }
 
 /// @title Staking contract for RewardToken
 /// @notice The controller contract is in charge of the communication and senstive data among all Lossless Environment Smart Contracts
-contract LosslessControllerV3 is Initializable, ContextUpgradeable, PausableUpgradeable {
+contract Staker is Initializable, ContextUpgradeable, PausableUpgradeable {
+
+    uint256 totalStaking;
 
     address public _admin;
     address public _rewardTokenAddress;
@@ -30,8 +32,11 @@ contract LosslessControllerV3 is Initializable, ContextUpgradeable, PausableUpgr
 
     struct Staking {
         uint256 amount;
-        uint256 timestamp;
+        uint256 blockStamp;
+        bool staking;
     }
+
+    mapping (address => Staking) stakingInfo;
 
 
     /// @notice Initializes the Staker Contract
@@ -59,7 +64,68 @@ contract LosslessControllerV3 is Initializable, ContextUpgradeable, PausableUpgr
         return 1;
     }
 
-    // SETTERS
-
     // STAKING
+
+    /// @notice This funciton let's a user stake
+    /// @param amount Amount to Stke
+    function deposit(uint256 amount) public {
+
+        require(!stakingInfo[msg.sender].staking, "STAKER: You're already staking");
+
+        uint64 depositFee = _rewardToken.getDepositFee();
+        uint256 feeAmount;
+
+        feeAmount = (amount * depositFee) / 10**2;
+
+        _rewardToken.transferFrom(msg.sender, address(this), amount + feeAmount);
+
+        stakingInfo[msg.sender].amount = amount;
+        stakingInfo[msg.sender].blockStamp = block.number;
+        stakingInfo[msg.sender].staking = true;
+
+        totalStaking += amount;
+    }
+
+    /// @notice This funciton let's a user withdraw staking + rewards
+    function withdraw() public {
+
+        require(stakingInfo[msg.sender].staking, "STAKER: You're not staking");
+
+        uint256 rewardsPeriod;
+        uint256 stakedStamp;
+
+        rewardsPeriod =  _rewardToken.getRewardPeriod();
+        stakedStamp = stakingInfo[msg.sender].blockStamp;
+
+        require(block.number - stakedStamp > rewardsPeriod, "STAKER: Wait one reward period");
+
+        uint256 totalBalance;
+        uint256 amountOfPeriods;
+        uint256 claimableReward;
+        uint256 amountStaked;
+        uint256 rewardsAllocated;
+        uint256 rewardsPercentage;
+
+        amountOfPeriods = (block.number - stakedStamp)/100;
+        amountStaked = stakingInfo[msg.sender].amount;
+        totalBalance = _rewardToken.balanceOf(address(this));
+        rewardsAllocated = totalBalance - totalStaking;
+
+        rewardsPercentage = ((amountStaked * 10**3 / rewardsAllocated) * amountOfPeriods);
+
+        claimableReward = (rewardsAllocated * rewardsPercentage)/10**3;
+
+        uint64 withdrawFee = _rewardToken.getWithdrawFee();
+        uint256 feeAmount;
+
+        feeAmount = (claimableReward * withdrawFee) / 10**2;
+        
+        _rewardToken.transfer(msg.sender, claimableReward - feeAmount);
+
+        totalStaking -= amountStaked;
+
+        stakingInfo[msg.sender].amount = 0;
+        stakingInfo[msg.sender].blockStamp = type(uint256).max;
+        stakingInfo[msg.sender].staking = false;
+    }
 }

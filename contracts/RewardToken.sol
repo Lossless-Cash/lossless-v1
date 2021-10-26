@@ -6,6 +6,7 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 import "./IERC20Metadata.sol";
+import "hardhat/console.sol";
 
 
 /**
@@ -404,18 +405,21 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
     /// @notice This function changes the reward period
     /// @param blocks Reward period in blocks
     function setNewPeriod(uint256 blocks) public onlyAdmin{
+        require(rewardPeriod != blocks, "ERC20: Period must be different");
         rewardPeriod = blocks;
     }
 
     /// @notice This function sets the deposit Fee
     /// @param fee Fee percentage
     function setDepositFee(uint64 fee) public onlyAdmin{
+        require(fee > 0, "ERC20: Fee must not be 0");
         depositFee = fee;
     }
 
     /// @notice This function sets the withdraw Fee
     /// @param fee Fee percentage
     function setWithdrawFee(uint64 fee) public onlyAdmin{
+        require(fee > 0, "ERC20: Fee must not be 0");
         withdrawFee = fee;
     }
 
@@ -428,23 +432,27 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
 
     /// @notice This functions turns off deposit fees
     function disableDepositFee() public onlyAdmin {
+        require(depositFee >= 0, "ERC20: Fee already disabled");
         previousDepositFee = depositFee;
         depositFee = 0;
     }
 
     /// @notice This functions turns off withdraw fees
     function disableWithdrawFee() public onlyAdmin {
+        require(withdrawFee >= 0, "ERC20: Fee already disabled");
         previousWithdrawFee = withdrawFee;
         withdrawFee = 0;
     }
 
     /// @notice This functions restores deposit fees
     function restoreDepositFee() public onlyAdmin {
+        require(depositFee <= 0, "ERC20: Fee not disabled");
         depositFee = previousDepositFee;
     }
 
     /// @notice This functions restores withdraw fees
     function restoreWithdrawFee() public onlyAdmin {
+        require(withdrawFee <= 0, "ERC20: Fee not disabled");
         withdrawFee = previousWithdrawFee;
     }
 

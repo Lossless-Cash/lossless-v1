@@ -33,8 +33,17 @@ const setupAddresses = async () => {
   };
 };
 
-const setupEnvironment = async () => {
-    return {};
+const setupEnvironment = async (rewardToken) => {
+
+    const StakerContract = await ethers.getContractFactory(
+      'Staker',
+    );
+
+    const stakerContract = await upgrades.deployProxy(StakerContract, [
+      rewardToken
+    ]);
+
+    return {stakerContract};
 };
 
 const setupToken = async (supply, name, symbol, deployer) => {
@@ -50,8 +59,15 @@ const setupToken = async (supply, name, symbol, deployer) => {
      return deployedToken;
 };
 
+async function mineBlocks(count) {
+  for (let i = 0; i < count; i += 1) {
+    await ethers.provider.send('evm_mine');
+  }
+}
+
 module.exports = {
     setupAddresses,
     setupEnvironment,
     setupToken,
+    mineBlocks,
 };

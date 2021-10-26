@@ -14,12 +14,13 @@ const symbol = "RAND";
 describe('Environment Tests', () => {
     beforeEach(async () => {
         adr = await setupAddresses();
-        env = await setupEnvironment();
         erc20Token = await setupToken(  initialSupply,
                                         name,
                                         symbol,
                                         adr.tokenDeployer
                                         );
+
+        env = await setupEnvironment(erc20Token.address);
     });
 
     describe("when setting up the environment", () =>{
@@ -46,6 +47,14 @@ describe('Environment Tests', () => {
                 expect(
                     await erc20Token.balanceOf(adr.tokenDeployer.address),
                 ).to.be.equal(initialSupply);
+            });
+        });
+        describe("when setting up a the staker token", ()=>{
+            it("should deploy correctly", async ()=>{
+                expect(
+                    await env.stakerContract.getVersion(),
+                ).to.be.equal(1);
+
             });
         });
     });

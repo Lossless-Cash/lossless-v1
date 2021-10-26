@@ -14,7 +14,6 @@ const symbol = "RAND";
 describe('ERC20 Tests', () => {
     beforeEach(async () => {
         adr = await setupAddresses();
-        env = await setupEnvironment();
         erc20Token = await setupToken(  initialSupply,
                                         name,
                                         symbol,
@@ -130,7 +129,16 @@ describe('ERC20 Tests', () => {
             });
             it("should restore withdraw fee", async()=>{
                 await erc20Token.connect(adr.tokenDeployer).setWithdrawFee(2);
+
+                expect(
+                    await erc20Token.getWithdrawFee(),
+                ).to.be.equal(2);
+
                 await erc20Token.connect(adr.tokenDeployer).disableWithdrawFee();
+
+                expect(
+                    await erc20Token.getWithdrawFee(),
+                ).to.be.equal(0);
 
                 await expect(
                     erc20Token.connect(adr.tokenDeployer).restoreWithdrawFee(),
