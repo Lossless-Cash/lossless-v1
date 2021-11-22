@@ -1,6 +1,11 @@
-## Start with
+# Lossless V1
 
-```sh
-npm i
-npm run test
-```
+In-depth documentation on Lossless V1 is available at [lossless.cash](https://lossless-cash.gitbook.io/lossless/).
+
+## Install Dependencies
+
+`npm i`
+
+## Run Tests
+
+`npm test`
